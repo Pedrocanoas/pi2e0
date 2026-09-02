@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Trained model weights and exports (large binaries, kept outside git)
+*.pt
+best26s_ncnn_model/
+
+# Dataset archives and extracted data (large, kept outside git)
+*.zip
+dataset/
+
+# Runtime output (debug frames, captured frames, confirmed-defect snapshots)
+runs/
+
+# Local tooling state
+.claude/
