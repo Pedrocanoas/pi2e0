@@ -8,9 +8,14 @@ from ultralytics import YOLO
 
 MODEL_PATH = "best26s_ncnn_model"
 
-CAMERA_URL = "http://127.0.0.1:8080/video"
+CAMERA_SOURCE = 1
 
-ROI = (112, 47, 1146, 720)
+
+def open_camera():
+    return cv2.VideoCapture(CAMERA_SOURCE, cv2.CAP_DSHOW)
+
+
+ROI = (0, 0, 1920, 1080)
 
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
 IMGSZ = 320
@@ -205,10 +210,10 @@ def main():
     print(f"📦 Loading trained model: {MODEL_PATH} (device={DEVICE}, imgsz={IMGSZ})")
     model = YOLO(MODEL_PATH)
 
-    cap = cv2.VideoCapture(CAMERA_URL)
+    cap = open_camera()
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     if not cap.isOpened():
-        raise RuntimeError("❌ Failed to access the IP camera.")
+        raise RuntimeError("❌ Failed to access the camera.")
 
     threads = [
         threading.Thread(target=capture_thread, args=(cap,), daemon=True),
@@ -221,6 +226,15 @@ def main():
     print("   Press 'q' in the video window (or Ctrl+C) to stop.")
 
     cv2.namedWindow("Glass Defect Inspection", cv2.WINDOW_NORMAL)
+    roi_w, roi_h = ROI[2] - ROI[0], ROI[3] - ROI[1]
+    display_w = min(roi_w, DISPLAY_MAX_WIDTH)
+    display_h = int(roi_h * display_w / roi_w)
+    # Force an actual size change (not just a same-size no-op) so Windows
+    # is forced to repaint the window; otherwise it can stay black until
+    # the user manually drags/resizes it.
+    cv2.resizeWindow("Glass Defect Inspection", display_w + 1, display_h + 1)
+    cv2.waitKey(1)
+    cv2.resizeWindow("Glass Defect Inspection", display_w, display_h)
 
     try:
         while True:

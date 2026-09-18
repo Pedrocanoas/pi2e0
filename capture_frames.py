@@ -4,7 +4,7 @@ import time
 
 import cv2
 
-from realtime_inspection import CAMERA_URL, ROI, crop_roi
+from realtime_inspection import CAMERA_SOURCE, ROI, crop_roi, open_camera
 
 OUT_DIR = os.path.join("runs", "captured_frames")
 DURATION_SEC = float(sys.argv[1]) if len(sys.argv) > 1 else 8.0
@@ -13,8 +13,8 @@ os.makedirs(OUT_DIR, exist_ok=True)
 for f in os.listdir(OUT_DIR):
     os.remove(os.path.join(OUT_DIR, f))
 
-print(f"Connecting to {CAMERA_URL} ...", flush=True)
-cap = cv2.VideoCapture(CAMERA_URL)
+print(f"Connecting to camera {CAMERA_SOURCE} ...", flush=True)
+cap = open_camera()
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 if not cap.isOpened():
     raise SystemExit("FAILED to open stream.")

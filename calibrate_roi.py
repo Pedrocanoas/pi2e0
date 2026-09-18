@@ -1,9 +1,9 @@
 import cv2
 
-CAMERA_URL = "http://127.0.0.1:8080/video"
+from realtime_inspection import CAMERA_SOURCE, open_camera
 
-print(f"Connecting to {CAMERA_URL} ...", flush=True)
-cap = cv2.VideoCapture(CAMERA_URL)
+print(f"Connecting to camera {CAMERA_SOURCE} ...", flush=True)
+cap = open_camera()
 if not cap.isOpened():
     raise SystemExit("FAILED to open stream.")
 
