@@ -1,0 +1,13 @@
+{
+  "id": "pedrocanoas/fork-of-glass-inspection-project",
+  "title": "Fork of Glass Inspection Project",
+  "code_file": "fork-of-glass-inspection-project.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["pedrocanoas/glass-defect"],
+  "competition_sources": [],
+  "kernel_sources": []
+}
