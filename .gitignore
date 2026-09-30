@@ -5,6 +5,7 @@ __pycache__/
 # Trained model weights and exports (large binaries, kept outside git)
 *.pt
 best26s_ncnn_model/
+best26s_256_ncnn_model/
 
 # Dataset archives and extracted data (large, kept outside git)
 *.zip

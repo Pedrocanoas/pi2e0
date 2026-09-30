@@ -6,7 +6,7 @@ import cv2
 import torch
 from ultralytics import YOLO
 
-MODEL_PATH = "best26s_ncnn_model"
+MODEL_PATH = "best26s_256_ncnn_model"
 
 CAMERA_SOURCE = 1
 
@@ -18,7 +18,7 @@ def open_camera():
 ROI = (0, 0, 1920, 1080)
 
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
-IMGSZ = 320
+IMGSZ = 256
 CONF_PREDICT = 0.4
 
 DISPLAY_MAX_WIDTH = 1200
