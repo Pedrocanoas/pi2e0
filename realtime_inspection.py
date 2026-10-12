@@ -1,4 +1,5 @@
 import os
+import socket
 import time
 import threading
 
@@ -6,7 +7,7 @@ import cv2
 import torch
 from ultralytics import YOLO
 
-MODEL_PATH = "best26s_256_ncnn_model"
+MODEL_PATH = "best26s_ncnn_model"
 
 CAMERA_SOURCE = 1
 
@@ -15,12 +16,71 @@ def open_camera():
     return cv2.VideoCapture(CAMERA_SOURCE, cv2.CAP_DSHOW)
 
 
+# ESP32 (motor_pwm_serial.ino) - connects over WiFi (TCP) since the ESP32
+# sits far from this PC, next to the motor. Reads the ESP32's IP from its
+# own Serial Monitor on boot (DHCP) and set it here - update if it changes.
+MOTOR_HOST = "192.168.0.0"  # <-- update with the ESP32's current IP
+MOTOR_PORT = 8080
+MOTOR_RESUME_SPEED = 100
+
+motor_socket = None
+
+
+def open_motor_connection():
+    global motor_socket
+    try:
+        motor_socket = socket.create_connection((MOTOR_HOST, MOTOR_PORT), timeout=3)
+        print(f"🔌 Motor connected at {MOTOR_HOST}:{MOTOR_PORT}.")
+    except OSError as e:
+        motor_socket = None
+        print(f"⚠️ Could not connect to motor at {MOTOR_HOST}:{MOTOR_PORT}: {e}")
+        print("   Continuing without motor control.")
+
+
+def send_motor_speed(percent):
+    global motor_socket
+    if motor_socket is None:
+        return
+    try:
+        motor_socket.sendall(f"{percent}\n".encode())
+    except OSError as e:
+        print(f"⚠️ Motor connection lost ({e}), trying to reconnect...")
+        motor_socket = None
+        open_motor_connection()
+        if motor_socket is not None:
+            try:
+                motor_socket.sendall(f"{percent}\n".encode())
+            except OSError as e2:
+                print(f"⚠️ Failed to send motor command after reconnect: {e2}")
+
+
+def stop_motor():
+    print("🛑 Stopping motor (defect confirmed).")
+    send_motor_speed(0)
+
+
+def resume_motor():
+    print(f"▶️ Resuming motor at {MOTOR_RESUME_SPEED}%.")
+    send_motor_speed(MOTOR_RESUME_SPEED)
+
+
+def stdin_resume_listener():
+    while running:
+        try:
+            line = input()
+        except EOFError:
+            break
+        if line.strip().lower() == "r":
+            resume_motor()
+
+
 ROI = (0, 0, 1920, 1080)
 
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
-IMGSZ = 256
+IMGSZ = 320
 CONF_PREDICT = 0.4
 
+HEADLESS = False
 DISPLAY_MAX_WIDTH = 1200
 
 TRACKER_CFG = "bytetrack_custom.yaml"
@@ -171,6 +231,7 @@ def inference_thread(model):
                         "frame": frame_count,
                     })
                     print(f"✅ Defect CONFIRMED (id={track_id}) after {stat['hits']} detections")
+                    stop_motor()
                     os.makedirs(RESULT_DIR, exist_ok=True)
                     cv2.imwrite(
                         os.path.join(RESULT_DIR, f"confirmed_defect_{track_id}_{frame_count}.jpg"),
@@ -210,6 +271,8 @@ def main():
     print(f"📦 Loading trained model: {MODEL_PATH} (device={DEVICE}, imgsz={IMGSZ})")
     model = YOLO(MODEL_PATH)
 
+    open_motor_connection()
+
     cap = open_camera()
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     if not cap.isOpened():
@@ -218,34 +281,47 @@ def main():
     threads = [
         threading.Thread(target=capture_thread, args=(cap,), daemon=True),
         threading.Thread(target=inference_thread, args=(model,), daemon=True),
+        threading.Thread(target=stdin_resume_listener, daemon=True),
     ]
     for t in threads:
         t.start()
 
     print(f"✅ Camera connected. A defect is confirmed after {CONFIRMATION_THRESHOLD} detections.")
-    print("   Press 'q' in the video window (or Ctrl+C) to stop.")
+    print("   Motor stops automatically on a confirmed defect - press 'r' in the")
+    print("   video window (or type 'r' + Enter here) to resume it manually.")
 
-    cv2.namedWindow("Glass Defect Inspection", cv2.WINDOW_NORMAL)
-    roi_w, roi_h = ROI[2] - ROI[0], ROI[3] - ROI[1]
-    display_w = min(roi_w, DISPLAY_MAX_WIDTH)
-    display_h = int(roi_h * display_w / roi_w)
-    # Force an actual size change (not just a same-size no-op) so Windows
-    # is forced to repaint the window; otherwise it can stay black until
-    # the user manually drags/resizes it.
-    cv2.resizeWindow("Glass Defect Inspection", display_w + 1, display_h + 1)
-    cv2.waitKey(1)
-    cv2.resizeWindow("Glass Defect Inspection", display_w, display_h)
+    if HEADLESS:
+        print("   Running headless (no display window). Press Ctrl+C to stop.")
+    else:
+        print("   Press 'q' in the video window (or Ctrl+C) to stop.")
+        cv2.namedWindow("Glass Defect Inspection", cv2.WINDOW_NORMAL)
+        roi_w, roi_h = ROI[2] - ROI[0], ROI[3] - ROI[1]
+        display_w = min(roi_w, DISPLAY_MAX_WIDTH)
+        display_h = int(roi_h * display_w / roi_w)
+        # Force an actual size change (not just a same-size no-op) so Windows
+        # is forced to repaint the window; otherwise it can stay black until
+        # the user manually drags/resizes it.
+        cv2.resizeWindow("Glass Defect Inspection", display_w + 1, display_h + 1)
+        cv2.waitKey(1)
+        cv2.resizeWindow("Glass Defect Inspection", display_w, display_h)
 
     try:
         while True:
+            if HEADLESS:
+                time.sleep(0.1)
+                continue
+
             with frame_lock:
                 display_frame = annotated_frame if annotated_frame is not None else latest_frame
 
             if display_frame is not None:
                 cv2.imshow("Glass Defect Inspection", resize_for_display(display_frame))
 
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
                 break
+            if key == ord("r"):
+                resume_motor()
     except KeyboardInterrupt:
         print("🛑 Manually interrupted.")
     finally:
@@ -253,7 +329,10 @@ def main():
         for t in threads:
             t.join(timeout=2)
         cap.release()
-        cv2.destroyAllWindows()
+        if motor_socket is not None:
+            motor_socket.close()
+        if not HEADLESS:
+            cv2.destroyAllWindows()
 
         print(f"\n📋 {len(confirmed_defects)} defect(s) confirmed (>= {CONFIRMATION_THRESHOLD} detections each):")
         for d in confirmed_defects:
