@@ -1,7 +1,11 @@
+import sys
 import time
+from pathlib import Path
+
 import numpy as np
 from ultralytics import YOLO
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from realtime_inspection import ROI, IMGSZ, CONF_PREDICT, TRACKER_CFG
 
 roi_w = ROI[2] - ROI[0]

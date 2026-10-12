@@ -1,5 +1,9 @@
+import sys
+from pathlib import Path
+
 import cv2
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from realtime_inspection import CAMERA_SOURCE, open_camera, resize_for_display
 
 print(f"Connecting to camera {CAMERA_SOURCE} ...", flush=True)
