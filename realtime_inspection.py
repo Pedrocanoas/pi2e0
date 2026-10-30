@@ -9,7 +9,7 @@ from ultralytics import YOLO
 
 MODEL_PATH = "best26s_ncnn_model"
 
-CAMERA_SOURCE = 1
+CAMERA_SOURCE = 1  # external USB webcam - re-run tools/list_cameras.py if this stops matching
 
 
 def open_camera():
@@ -17,9 +17,10 @@ def open_camera():
 
 
 # ESP32 (motor_pwm_serial.ino) - connects over WiFi (TCP) since the ESP32
-# sits far from this PC, next to the motor. Reads the ESP32's IP from its
-# own Serial Monitor on boot (DHCP) and set it here - update if it changes.
-MOTOR_HOST = "192.168.0.0"  # <-- update with the ESP32's current IP
+# sits far from this PC, next to the motor. The ESP32 runs its own Access
+# Point (WiFi.softAP) instead of joining an external network, so this IP
+# is always fixed - connect this PC to the "ESP32-Motor" WiFi network.
+MOTOR_HOST = "192.168.4.1"
 MOTOR_PORT = 8080
 MOTOR_RESUME_SPEED = 100
 
@@ -74,7 +75,7 @@ def stdin_resume_listener():
             resume_motor()
 
 
-ROI = (0, 0, 1920, 1080)
+ROI = (149, 52, 536, 435)
 
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
 IMGSZ = 320
